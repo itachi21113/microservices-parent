@@ -1,10 +1,13 @@
 package com.utkarsh.inventory_service.service;
 
+import com.utkarsh.inventory_service.dto.InventoryResponse;
 import com.utkarsh.inventory_service.repository.InventoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -14,13 +17,17 @@ public class InventoryService {
     private final InventoryRepository inventoryRepository;
 
     @Transactional(readOnly = true) // readOnly because we are not changing data
-    public boolean isInStock(String skuCode) {
-        log.info("Checking stock for skuCode: {}", skuCode);
+    public List<InventoryResponse> isInStock(List<String> skuCode) {
+        log.info("Checking stock for skuCodes: {}", skuCode);
 
-        // Find the inventory item by its skuCode
-        // If it's present, check if quantity > 0
-        return inventoryRepository.findBySkuCode(skuCode)
-                .map(inventory -> inventory.getQuantity() > 0)
-                .orElse(false); // If not present, it's not in stock
+        // 2. Call the new repository method
+        return inventoryRepository.findBySkuCodeIn(skuCode).stream()
+                // 3. Map the result to our new DTO
+                .map(inventory ->
+                        InventoryResponse.builder()
+                                .skuCode(inventory.getSkuCode())
+                                .isInStock(inventory.getQuantity() > 0) //]
+                                .build()
+                ).toList();
     }
 }
