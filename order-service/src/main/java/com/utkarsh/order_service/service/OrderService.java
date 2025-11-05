@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final WebClient webClient;
+    private final WebClient.Builder webClientBuilder;
 
     public void placeOrder(OrderRequest orderRequest) {
         // 1. Create order object
@@ -47,8 +47,8 @@ public class OrderService {
         // 4. Call InventoryService using POST and sending skuCodes in the body
 
         // Call InventoryService using POST and sending skuCodes in the body
-        InventoryResponse[] inventoryResponseArray = webClient.post()
-                .uri("http://localhost:8082/api/inventory") // The endpoint is now a POST
+        InventoryResponse[] inventoryResponseArray = webClientBuilder.build().post()
+                .uri("http://inventory-service/api/inventory") // The endpoint is now a POST
                 .bodyValue(skuCodes) // Send the list as the request body
                 .retrieve()
                 .bodyToMono(InventoryResponse[].class)
