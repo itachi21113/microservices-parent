@@ -15,6 +15,7 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar" />
         </processorPath>
         <module name="product-service" />
+        <module name="discovery-server" />
         <module name="inventory-service" />
         <module name="order-service" />
       </profile>
@@ -22,6 +23,7 @@
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="discovery-server" options="-parameters" />
       <module name="inventory-service" options="-parameters" />
       <module name="microservices-parent" options="-parameters" />
       <module name="order-service" options="-parameters" />
