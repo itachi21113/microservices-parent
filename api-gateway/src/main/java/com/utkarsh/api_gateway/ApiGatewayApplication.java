@@ -1,15 +1,15 @@
-package com.utkarsh.product_service;
+package com.utkarsh.api_gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 
 @SpringBootApplication
-
-public class ProductServiceApplication {
+@EnableDiscoveryClient
+public class ApiGatewayApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ProductServiceApplication.class, args);
+		SpringApplication.run(ApiGatewayApplication.class, args);
 	}
 
 }
