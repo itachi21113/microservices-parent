@@ -1,4 +1,4 @@
-package com.utkarsh.notification_service;
+package com.utkarsh.notification_service.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
