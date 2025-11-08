@@ -6,6 +6,8 @@ import com.utkarsh.order_service.dto.OrderRequest;
 import com.utkarsh.order_service.model.Order;
 import com.utkarsh.order_service.model.OrderLineItem;
 import com.utkarsh.order_service.repository.OrderRepository;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,8 +25,9 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
+    private final Tracer tracer;
 
-    public void placeOrder(OrderRequest orderRequest) {
+    public String placeOrder(OrderRequest orderRequest) {
         // 1. Create order object
         Order order = new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
@@ -44,29 +47,36 @@ public class OrderService {
 
         log.info("Checking inventory for skuCodes: {}", skuCodes);
 
-        // 4. Call InventoryService using POST and sending skuCodes in the body
+        // Create a new span named "InventoryServiceLookup"
+        Span inventoryServiceLookupSpan = tracer.nextSpan().name("InventoryServiceLookup");
 
-        // Call InventoryService using POST and sending skuCodes in the body
-        InventoryResponse[] inventoryResponseArray = webClientBuilder.build().post()
-                .uri("http://inventory-service/api/inventory") // The endpoint is now a POST
-                .bodyValue(skuCodes) // Send the list as the request body
-                .retrieve()
-                .bodyToMono(InventoryResponse[].class)
-                .block(); // Still synchronous
+        // Start the span and add it to the current scope
+        try (Tracer.SpanInScope spanInScope = tracer.withSpan(inventoryServiceLookupSpan.start())) {
 
-        // 5. Check if all products are in stock
+            // This is your original WebClient call
+            InventoryResponse[] inventoryResponseArray = webClientBuilder.build().post()
+                    .uri("http://inventory-service/api/inventory")
+                    .bodyValue(skuCodes)
+                    .retrieve()
+                    .bodyToMono(InventoryResponse[].class)
+                    .block();
+// === New Tracing Code END ===
 
-        boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
-                .allMatch(InventoryResponse::isInStock);
+            boolean allProductsInStock = Arrays.stream(inventoryResponseArray)
+                    .allMatch(InventoryResponse::isInStock);
 
-        // 6. If all products are in stock, save the order
+            if (allProductsInStock) {
+                orderRepository.save(order);
+                log.info("Order {} placed successfully", order.getOrderNumber());
+                return "Order Placed Successfully";
+            } else {
+                log.error("Not all products are in stock, order failed.");
+                throw new IllegalArgumentException("One or more products are not in stock. Please try again later.");
+            }
 
-        if (allProductsInStock) {
-            orderRepository.save(order);
-            log.info("Order {} placed successfully", order.getOrderNumber());
-        } else {
-            log.error("Not all products are in stock, order failed.");
-            throw new IllegalArgumentException("One or more products are not in stock. Please try again later.");
+        } finally {
+            // End the span when the block is finished
+            inventoryServiceLookupSpan.end();
         }
     }
 
