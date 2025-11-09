@@ -18,7 +18,7 @@ public class NotificationServiceApplication {
 
 	@KafkaListener(topics = "notificationTopic", groupId = "notificationId")
 	public void listen(OrderPlacedEvent orderPlacedEvent) {
-		log.info("Received OrderPlacedEvent: {}", orderPlacedEvent);
+		log.info("Received OrderPlacedEvent Meowwwwww: {}", orderPlacedEvent);
 	}
 
 }
