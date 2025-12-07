@@ -23,7 +23,7 @@ public class InventoryService {
         log.info("Checking stock for skuCodes: {}", skuCode);
 
         log.info("Wait Started");
-        Thread.sleep(1000); // 10 second delay
+//        Thread.sleep(1000); // 10 second delay
         log.info("Wait Ended");
 
         // 2. Call the new repository method

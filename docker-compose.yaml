@@ -88,10 +88,16 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
-      # FIX: New Spring Boot 3 Property
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
-      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8181/realms/spring-boot-microservices-realm
+
+      # FIX 1: This MUST match the "iss" field in your Postman token exactly.
+      # Postman gets the token from localhost:8181, so this must be localhost:8181.
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8181/realms/spring-boot-microservices-realm
+
+      # FIX 2: This tells the Gateway where to actually CONNECT to find the keys.
+      # It ignores the issuer-uri above and goes straight to the internal container on port 8080.
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/spring-boot-microservices-realm/protocol/openid-connect/certs
+
     depends_on:
       - discovery-server
       - keycloak
