@@ -5,6 +5,7 @@ import com.utkarsh.order_service.service.OrderService;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,7 +15,7 @@ import java.util.concurrent.CompletableFuture;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/order")
-
+@Slf4j
 public class OrderController {
 
     private final OrderService orderService;
@@ -28,8 +29,8 @@ public class OrderController {
     }
 
     public CompletableFuture<String> fallbackMethod(OrderRequest orderRequest, RuntimeException runtimeException) {
-        // Return a simple message to the user
-        runtimeException.printStackTrace();
+// Log the error for debugging
+        log.error("Circuit breaker fallback triggered. Error calling inventory-service: {}", runtimeException.getMessage(), runtimeException);
         return CompletableFuture.supplyAsync(() -> "Oops! Something went wrong, please try again later.");
     }
 }

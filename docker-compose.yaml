@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 services:
   # ==============================
   # INFRASTRUCTURE
@@ -21,7 +21,7 @@ services:
       - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://broker:29092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -45,6 +45,16 @@ services:
     command: start-dev
     volumes:
       - keycloak_data:/opt/keycloak/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8080/health/ready 2>&1 || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
 
   mysql:
     image: mysql:8.0
@@ -76,9 +86,16 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       # FIX: New Spring Boot 3 Property
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
-      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@localhost:8761/eureka/
+      # Discovery server doesn't register with itself, but URL still needs to be valid
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
     depends_on:
       - zipkin
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8761 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
 
   api-gateway:
     image: api-gateway:latest
@@ -89,6 +106,9 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      # Eureka client retry configuration
+      - EUREKA_CLIENT_INITIAL_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS=5
+      - EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=5
 
       # FIX 1: This MUST match the "iss" field in your Postman token exactly.
       # Postman gets the token from localhost:8181, so this must be localhost:8181.
@@ -99,9 +119,12 @@ services:
       - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/spring-boot-microservices-realm/protocol/openid-connect/certs
 
     depends_on:
-      - discovery-server
-      - keycloak
-      - zipkin
+      discovery-server:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   product-service:
     image: product-service:latest
@@ -114,10 +137,21 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
       # FIX: New Spring Boot 3 Property
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      # Eureka client retry configuration
+      - EUREKA_CLIENT_INITIAL_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS=5
+      - EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=5
+      # Keycloak JWT Configuration - issuer matches token, jwk-set uses internal Docker network
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://localhost:8181/realms/spring-boot-microservices-realm
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/spring-boot-microservices-realm/protocol/openid-connect/certs
     depends_on:
-      - mongo
-      - discovery-server
-      - zipkin
+      mongo:
+        condition: service_started
+      discovery-server:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   order-service:
     image: order-service:latest
@@ -131,11 +165,18 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
       # FIX: New Spring Boot 3 Property
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      # Eureka client retry configuration
+      - EUREKA_CLIENT_INITIAL_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS=5
+      - EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=5
     depends_on:
-      - mysql
-      - broker
-      - discovery-server
-      - zipkin
+      mysql:
+        condition: service_started
+      broker:
+        condition: service_started
+      discovery-server:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   inventory-service:
     image: inventory-service:latest
@@ -148,10 +189,16 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
       # FIX: New Spring Boot 3 Property
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      # Eureka client retry configuration
+      - EUREKA_CLIENT_INITIAL_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS=5
+      - EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=5
     depends_on:
-      - mysql
-      - discovery-server
-      - zipkin
+      mysql:
+        condition: service_started
+      discovery-server:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
   notification-service:
     image: notification-service:latest
@@ -162,10 +209,16 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
       # FIX: New Spring Boot 3 Property
       - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      # Eureka client retry configuration
+      - EUREKA_CLIENT_INITIAL_INSTANCE_INFO_REPLICATION_INTERVAL_SECONDS=5
+      - EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS=5
     depends_on:
-      - broker
-      - discovery-server
-      - zipkin
+      broker:
+        condition: service_started
+      discovery-server:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
 
 volumes:
   mysql_data:
