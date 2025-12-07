@@ -1,5 +1,8 @@
 version: '3.8'
 services:
+  # ==============================
+  # INFRASTRUCTURE
+  # ==============================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.0.1
     container_name: zookeeper
@@ -54,12 +57,109 @@ services:
       - mysql_data:/var/lib/mysql
 
   mongo:
-    image: mongo:4.4.6 # Using same version as your integration tests
+    image: mongo:4.4.6
     container_name: mongo
     ports:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+
+  # ==============================
+  # MICROSERVICES
+  # ==============================
+  discovery-server:
+    image: discovery-server:latest
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      # FIX: New Spring Boot 3 Property
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@localhost:8761/eureka/
+    depends_on:
+      - zipkin
+
+  api-gateway:
+    image: api-gateway:latest
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
+      # FIX: New Spring Boot 3 Property
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8181/realms/spring-boot-microservices-realm
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI=http://keycloak:8080/realms/spring-boot-microservices-realm/protocol/openid-connect/certs
+    depends_on:
+      - discovery-server
+      - keycloak
+      - zipkin
+
+  product-service:
+    image: product-service:latest
+    container_name: product-service
+    ports:
+      - "8282:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/ProductService
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
+      # FIX: New Spring Boot 3 Property
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - mongo
+      - discovery-server
+      - zipkin
+
+  order-service:
+    image: order-service:latest
+    container_name: order-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/order-service-db
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=broker:29092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
+      # FIX: New Spring Boot 3 Property
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - mysql
+      - broker
+      - discovery-server
+      - zipkin
+
+  inventory-service:
+    image: inventory-service:latest
+    container_name: inventory-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/inventory-service-db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
+      # FIX: New Spring Boot 3 Property
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - mysql
+      - discovery-server
+      - zipkin
+
+  notification-service:
+    image: notification-service:latest
+    container_name: notification-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=broker:29092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:password@discovery-server:8761/eureka/
+      # FIX: New Spring Boot 3 Property
+      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
+    depends_on:
+      - broker
+      - discovery-server
+      - zipkin
 
 volumes:
   mysql_data:
